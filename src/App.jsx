@@ -186,13 +186,13 @@ function ImagesTab({ client }) {
     if (!product.trim()) { alert("Please enter a product name."); return; }
     setLoading(true); setImages([]); setError("");
     const toneStyle = TONE_PHOTO[client.tone]||"professional commercial photography";
-    const basePrompt = `${style} of ${product}, ${client.niche} brand. ${toneStyle}. Professional product photography, commercial quality, highly detailed, photorealistic. ${NO_TEXT}. ${extra}`.trim();
+    const basePrompt = `${style} of ${product}, ${client.niche} brand. ${toneStyle}. Professional product photography, commercial quality, highly detailed, photorealistic. ${NO_TEXT}. Absolutely no text anywhere in the image. ${extra}`.trim();
     try {
       const jobs = Array.from({length:count}, (_,i) =>
-        fetch("https://fal.run/fal-ai/flux/schnell", {
+        fetch("https://fal.run/fal-ai/flux/dev", {
           method:"POST",
           headers:{ "Authorization":`Key ${FAL_KEY}`, "Content-Type":"application/json" },
-          body:JSON.stringify({ prompt: basePrompt + (i > 0 ? `, unique angle variation ${i+1}` : ""), num_images:1, image_size:"square_hd", num_inference_steps:4 })
+          body:JSON.stringify({ prompt: basePrompt + (i > 0 ? `, unique angle variation ${i+1}` : ""), num_images:1, image_size:"square_hd", num_inference_steps:28, guidance_scale:3.5, model:"fal-ai/flux/dev" })
         }).then(r=>r.json())
       );
       const results = await Promise.all(jobs);

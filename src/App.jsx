@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 const FAL_KEY = "a68e1d53-d6f1-48a3-96c7-8d63868ccdc6:0f5699db847fb71d23f1484334f8225e";
+const CLOUDINARY_CLOUD = "dnwlrmg7r";
+const CLOUDINARY_UPLOAD_PRESET = "reelforge_unsigned";
 
 const COLORS = [
   { bg: "#1e1560", fg: "#c4b8ff" },
@@ -14,19 +16,28 @@ const COLORS = [
 const NICHES = ["Skincare & Beauty","Fashion & Apparel","Fitness & Health","Food & Beverage","Tech & Gadgets","Home & Lifestyle","Travel & Experience","Pet Products","Education & Courses","E-commerce / DTC","Other"];
 const TONES = ["Fun & Energetic","Luxury & Premium","Trendy & Gen-Z","Motivational","Educational","Warm & Friendly","Bold & Edgy","Minimalist & Clean"];
 const GOALS = ["Drive sales & purchases","Build brand awareness","Boost engagement & interaction","Build trust & credibility","Go viral & maximize shares"];
-const IMAGE_STYLES = ["Product on clean white background","Lifestyle shot — product in use","Flat lay with props","Dark luxury studio lighting","Outdoor natural light","Minimalist aesthetic","Bold colorful editorial"];
-const TONE_PHOTO = {
-  "Luxury & Premium": "ultra luxury product photography, dark moody background, dramatic chiaroscuro lighting, cinematic",
-  "Fun & Energetic": "bright vibrant colors, playful composition, pastel pop background, energetic",
-  "Trendy & Gen-Z": "aesthetic trendy style, soft gradient background, social media ready, modern editorial",
-  "Motivational": "bold strong composition, clean powerful lighting, stark contrast, dynamic",
-  "Educational": "clean product shot, soft even lighting, neutral white background, clear",
-  "Warm & Friendly": "warm golden tones, cozy inviting atmosphere, soft bokeh background",
-  "Bold & Edgy": "high contrast, dark dramatic background, striking neon accents, edgy",
-  "Minimalist & Clean": "pure minimalism, white background, lots of negative space, clean lines",
-};
 
-const NO_TEXT = "no text, no words, no letters, no typography, no writing, no labels, no watermarks";
+const SCENE_STYLES = [
+  "Luxury flat lay on marble surface with flowers",
+  "Lifestyle shot — product being used by a person",
+  "Outdoor natural light on wooden table",
+  "Dark moody studio with dramatic lighting",
+  "Minimalist white background with soft shadows",
+  "Bold colorful editorial with props",
+  "Cozy home setting with warm tones",
+  "Beach or outdoor nature setting",
+];
+
+const TONE_PHOTO = {
+  "Luxury & Premium": "ultra luxury, dark moody background, dramatic chiaroscuro lighting, cinematic feel",
+  "Fun & Energetic": "bright vibrant colors, playful composition, pastel pop background",
+  "Trendy & Gen-Z": "aesthetic trendy style, soft gradient background, social media ready",
+  "Motivational": "bold strong composition, clean powerful lighting, stark contrast",
+  "Educational": "clean shot, soft even lighting, neutral background",
+  "Warm & Friendly": "warm golden tones, cozy inviting atmosphere, soft bokeh",
+  "Bold & Edgy": "high contrast, dark dramatic background, striking neon accents",
+  "Minimalist & Clean": "pure minimalism, white background, lots of negative space",
+};
 
 const INITIAL_CLIENTS = [
   { id:1, name:"Glow Studio", niche:"Skincare & Beauty", tone:"Luxury & Premium", audience:"Women 25-40 into self-care", notes:'Use "ritual", "radiant". Avoid clinical language.', c:0 },
@@ -100,6 +111,7 @@ function ErrorBox({ msg }) {
   return <div style={{ background:"rgba(244,114,182,.08)", border:"1px solid rgba(244,114,182,.2)", borderRadius:9, padding:14, color:"#f472b6", fontSize:13, marginBottom:14 }}>⚠ {msg}</div>;
 }
 
+// ── Campaign Tab ──────────────────────────────────────────────
 function CampaignTab({ client }) {
   const [product,setProduct]=useState(""); const [goal,setGoal]=useState(GOALS[0]);
   const [usp,setUsp]=useState(""); const [extra,setExtra]=useState("");
@@ -177,22 +189,61 @@ CONCEPT: [Simple 15-30 second video concept, 3-4 sentences]`;
   );
 }
 
+// ── Images Tab ────────────────────────────────────────────────
 function ImagesTab({ client }) {
-  const [product,setProduct]=useState(""); const [style,setStyle]=useState(IMAGE_STYLES[0]);
-  const [extra,setExtra]=useState(""); const [count,setCount]=useState(2);
-  const [loading,setLoading]=useState(false); const [images,setImages]=useState([]); const [error,setError]=useState("");
+  const [uploadedUrl, setUploadedUrl] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [scene, setScene] = useState(SCENE_STYLES[0]);
+  const [extra, setExtra] = useState("");
+  const [count, setCount] = useState(2);
+  const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [images, setImages] = useState([]);
+  const [error, setError] = useState("");
+  const fileRef = useRef();
+
+  const handleFile = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    setPreviewUrl(URL.createObjectURL(file));
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+      formData.append("cloud_name", CLOUDINARY_CLOUD);
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      setUploadedUrl(data.secure_url);
+    } catch(e) {
+      setError("Upload failed: " + (e.message||"Please try again."));
+      setPreviewUrl("");
+    }
+    setUploading(false);
+  };
 
   const generate = async () => {
-    if (!product.trim()) { alert("Please enter a product name."); return; }
+    if (!uploadedUrl) { alert("Please upload a product image first."); return; }
     setLoading(true); setImages([]); setError("");
-    const toneStyle = TONE_PHOTO[client.tone]||"professional commercial photography";
-    const basePrompt = `${style} of ${product}, ${client.niche} brand. ${toneStyle}. Professional product photography, commercial quality, highly detailed, photorealistic. ${NO_TEXT}. Absolutely no text anywhere in the image. ${extra}`.trim();
+    const toneStyle = TONE_PHOTO[client.tone] || "professional commercial photography";
+    const prompt = `${scene}. ${toneStyle}. Keep the product exactly as it is, same shape, same packaging, same colors. Only change the background and setting. Professional commercial photography. ${extra}`.trim();
     try {
       const jobs = Array.from({length:count}, (_,i) =>
-        fetch("https://fal.run/fal-ai/flux/dev", {
+        fetch("https://fal.run/fal-ai/flux/dev/image-to-image", {
           method:"POST",
           headers:{ "Authorization":`Key ${FAL_KEY}`, "Content-Type":"application/json" },
-          body:JSON.stringify({ prompt: basePrompt + (i > 0 ? `, unique angle variation ${i+1}` : ""), num_images:1, image_size:"square_hd", num_inference_steps:28, guidance_scale:3.5, model:"fal-ai/flux/dev" })
+          body:JSON.stringify({
+            image_url: uploadedUrl,
+            prompt: prompt + (i > 0 ? ` composition variation ${i+1}` : ""),
+            strength: 0.75,
+            num_images: 1,
+            num_inference_steps: 28,
+            guidance_scale: 3.5,
+          })
         }).then(r=>r.json())
       );
       const results = await Promise.all(jobs);
@@ -203,64 +254,85 @@ function ImagesTab({ client }) {
     setLoading(false);
   };
 
-  const openCanva = () => {
-    window.open("https://www.canva.com/create/instagram-posts/", "_blank");
-  };
-
   return (
     <div>
-      <Panel title="Image brief">
+      <Panel title="Product image upload">
+        <div
+          onClick={() => fileRef.current.click()}
+          onDragOver={e => e.preventDefault()}
+          onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); }}
+          style={{ border:"2px dashed #353548", borderRadius:10, padding:"28px 20px", textAlign:"center", cursor:"pointer", transition:"border-color .15s", marginBottom:14, position:"relative", background:"#111118" }}
+        >
+          {previewUrl ? (
+            <div style={{ display:"flex", alignItems:"center", gap:14, justifyContent:"center" }}>
+              <img src={previewUrl} alt="Product preview" style={{ width:80, height:80, objectFit:"contain", borderRadius:8, background:"#1a1a26" }}/>
+              <div style={{ textAlign:"left" }}>
+                <div style={{ fontSize:13, color:"#ededf5", fontWeight:500, marginBottom:3 }}>{uploading ? "Uploading..." : "✓ Image uploaded"}</div>
+                <div style={{ fontSize:11, color:"#888898" }}>Click to replace</div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize:28, marginBottom:8, opacity:.3 }}>⬆</div>
+              <div style={{ fontSize:13, color:"#ededf5", fontWeight:500, marginBottom:4 }}>{uploading ? "Uploading..." : "Click or drag to upload product photo"}</div>
+              <div style={{ fontSize:11, color:"#888898" }}>JPG, PNG or WEBP — your client's actual product</div>
+            </>
+          )}
+          <input ref={fileRef} type="file" accept="image/*" style={{ display:"none" }} onChange={e => handleFile(e.target.files[0])}/>
+        </div>
+
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          <div><Label>Product name</Label><input value={product} onChange={e=>setProduct(e.target.value)} placeholder="e.g. Vitamin C Serum" style={baseInp}/></div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-            <div><Label>Image style</Label><select value={style} onChange={e=>setStyle(e.target.value)} style={baseInp}>{IMAGE_STYLES.map(s=><option key={s}>{s}</option>)}</select></div>
-            <div><Label>Number of images</Label><select value={count} onChange={e=>setCount(Number(e.target.value))} style={baseInp}>{[1,2,3,4].map(n=><option key={n} value={n}>{n} image{n>1?"s":""}</option>)}</select></div>
+          <div><Label>Scene style</Label>
+            <select value={scene} onChange={e=>setScene(e.target.value)} style={baseInp}>
+              {SCENE_STYLES.map(s=><option key={s}>{s}</option>)}
+            </select>
           </div>
-          <div><Label>Extra details (optional)</Label><input value={extra} onChange={e=>setExtra(e.target.value)} placeholder="e.g. pink roses, marble surface, gold packaging..." style={baseInp}/></div>
-          <div style={{ padding:"10px 12px", background:"rgba(34,211,160,.06)", border:"1px solid rgba(34,211,160,.15)", borderRadius:8, fontSize:12, color:"#888898", lineHeight:1.6 }}>
-            <span style={{ color:"#22d3a0", fontWeight:500 }}>✓ Text-free mode on:</span> Images are generated without any letters or words — ready to brand in Canva with your client's fonts and logo.
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div><Label>Number of variations</Label>
+              <select value={count} onChange={e=>setCount(Number(e.target.value))} style={baseInp}>
+                {[1,2,3,4].map(n=><option key={n} value={n}>{n} variation{n>1?"s":""}</option>)}
+              </select>
+            </div>
+            <div><Label>Extra details (optional)</Label>
+              <input value={extra} onChange={e=>setExtra(e.target.value)} placeholder="e.g. golden hour, rose petals..." style={baseInp}/>
+            </div>
+          </div>
+          <div style={{ padding:"10px 12px", background:"rgba(124,106,255,.07)", border:"1px solid rgba(124,106,255,.15)", borderRadius:8, fontSize:12, color:"#888898", lineHeight:1.5 }}>
+            <span style={{ color:"#7c6aff", fontWeight:500 }}>Auto-tuned for {client.name}:</span> Scene lighting will match the <span style={{color:"#ededf5"}}>{client.tone}</span> brand tone. Product stays identical.
           </div>
         </div>
-        <GenBtn onClick={generate} loading={loading} label={`Generate ${count} product image${count>1?"s":""}`}/>
+        <GenBtn onClick={generate} loading={loading} disabled={uploading||!uploadedUrl} label={`Generate ${count} creative variation${count>1?"s":""}`}/>
       </Panel>
 
       <ErrorBox msg={error}/>
 
       {loading && (
         <div style={{ textAlign:"center", padding:48, color:"#888898" }}>
-          <div style={{ fontSize:13, marginBottom:6 }}>Generating {count} image{count>1?"s":""} for {client.name}...</div>
-          <div style={{ fontSize:11 }}>This takes 10–20 seconds ☕</div>
+          <div style={{ fontSize:13, marginBottom:6 }}>Generating {count} variation{count>1?"s":""} for {client.name}...</div>
+          <div style={{ fontSize:11 }}>This takes 20–40 seconds ☕</div>
         </div>
       )}
 
       {images.length > 0 && <>
-        <SectionLabel>Generated images</SectionLabel>
-
+        <SectionLabel>Creative variations — right-click any image to save</SectionLabel>
         <div style={{ padding:"12px 14px", background:"rgba(124,106,255,.07)", border:"1px solid rgba(124,106,255,.15)", borderRadius:10, marginBottom:14, display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
           <div>
-            <div style={{ fontSize:13, color:"#ededf5", fontWeight:500, marginBottom:3 }}>Ready to brand in Canva</div>
-            <div style={{ fontSize:12, color:"#888898" }}>Open Canva → upload your image → add your client's text, logo, and colors</div>
+            <div style={{ fontSize:13, color:"#ededf5", fontWeight:500, marginBottom:3 }}>Add branding in Canva</div>
+            <div style={{ fontSize:12, color:"#888898" }}>Upload your image → add client's text, logo, and colors</div>
           </div>
-          <button onClick={openCanva} style={{ padding:"9px 18px", borderRadius:8, border:"none", background:"#7c6aff", color:"#fff", cursor:"pointer", fontFamily:"'Space Grotesk',system-ui,sans-serif", fontSize:12, fontWeight:600, whiteSpace:"nowrap", flexShrink:0 }}>
+          <button onClick={()=>window.open("https://www.canva.com/create/instagram-posts/","_blank")} style={{ padding:"9px 18px", borderRadius:8, border:"none", background:"#7c6aff", color:"#fff", cursor:"pointer", fontFamily:"'Space Grotesk',system-ui,sans-serif", fontSize:12, fontWeight:600, whiteSpace:"nowrap", flexShrink:0 }}>
             Open Canva ↗
           </button>
         </div>
-
         <div style={{ display:"grid", gridTemplateColumns:`repeat(${Math.min(count,2)},1fr)`, gap:12, marginBottom:12 }}>
           {images.map((url,i)=>(
             <div key={i} style={{ background:"#1a1a26", border:"1px solid #252535", borderRadius:10, overflow:"hidden" }}>
-              <img src={url} alt={`Product image ${i+1}`} style={{ width:"100%", display:"block" }}/>
+              <img src={url} alt={`Variation ${i+1}`} style={{ width:"100%", display:"block" }}/>
               <div style={{ padding:"9px 12px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
-                <span style={{ fontSize:11, color:"#888898" }}>Image {i+1}</span>
+                <span style={{ fontSize:11, color:"#888898" }}>Variation {i+1}</span>
                 <div style={{ display:"flex", gap:6 }}>
-                  <a href={url} target="_blank" rel="noreferrer"
-                    style={{ fontSize:11, color:"#888898", textDecoration:"none", padding:"4px 10px", border:"1px solid #353548", borderRadius:5 }}>
-                    Save ↓
-                  </a>
-                  <button onClick={openCanva}
-                    style={{ fontSize:11, color:"#7c6aff", padding:"4px 10px", border:"1px solid rgba(124,106,255,.3)", borderRadius:5, background:"none", cursor:"pointer", fontFamily:"inherit" }}>
-                    Edit in Canva ↗
-                  </button>
+                  <a href={url} target="_blank" rel="noreferrer" style={{ fontSize:11, color:"#888898", textDecoration:"none", padding:"4px 10px", border:"1px solid #353548", borderRadius:5 }}>Save ↓</a>
+                  <button onClick={()=>window.open("https://www.canva.com/create/instagram-posts/","_blank")} style={{ fontSize:11, color:"#7c6aff", padding:"4px 10px", border:"1px solid rgba(124,106,255,.3)", borderRadius:5, background:"none", cursor:"pointer", fontFamily:"inherit" }}>Edit in Canva ↗</button>
                 </div>
               </div>
             </div>
@@ -271,6 +343,7 @@ function ImagesTab({ client }) {
   );
 }
 
+// ── Add Client Modal ──────────────────────────────────────────
 function AddClientModal({ onClose, onSave }) {
   const [name,setName]=useState(""); const [niche,setNiche]=useState("");
   const [tone,setTone]=useState(""); const [audience,setAudience]=useState(""); const [notes,setNotes]=useState("");
@@ -300,6 +373,7 @@ function AddClientModal({ onClose, onSave }) {
   );
 }
 
+// ── Root ─────────────────────────────────────────────────────
 export default function App() {
   const [clients,setClients]=useState(INITIAL_CLIENTS);
   const [nextId,setNextId]=useState(4);

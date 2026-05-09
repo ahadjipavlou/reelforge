@@ -26,6 +26,8 @@ const TONE_PHOTO = {
   "Minimalist & Clean": "pure minimalism, white background, lots of negative space, clean lines",
 };
 
+const NO_TEXT = "no text, no words, no letters, no typography, no writing, no labels, no watermarks";
+
 const INITIAL_CLIENTS = [
   { id:1, name:"Glow Studio", niche:"Skincare & Beauty", tone:"Luxury & Premium", audience:"Women 25-40 into self-care", notes:'Use "ritual", "radiant". Avoid clinical language.', c:0 },
   { id:2, name:"FitCore", niche:"Fitness & Health", tone:"Motivational", audience:"Men & women 20-35 into home workouts", notes:"High energy, empowering language.", c:1 },
@@ -184,13 +186,13 @@ function ImagesTab({ client }) {
     if (!product.trim()) { alert("Please enter a product name."); return; }
     setLoading(true); setImages([]); setError("");
     const toneStyle = TONE_PHOTO[client.tone]||"professional commercial photography";
-    const basePrompt = `${style} of ${product}, ${client.niche} brand. ${toneStyle}. Professional product photography, commercial quality, highly detailed. ${extra}`.trim();
+    const basePrompt = `${style} of ${product}, ${client.niche} brand. ${toneStyle}. Professional product photography, commercial quality, highly detailed, photorealistic. ${NO_TEXT}. ${extra}`.trim();
     try {
       const jobs = Array.from({length:count}, (_,i) =>
         fetch("https://fal.run/fal-ai/flux/schnell", {
           method:"POST",
           headers:{ "Authorization":`Key ${FAL_KEY}`, "Content-Type":"application/json" },
-          body:JSON.stringify({ prompt: basePrompt + (i > 0 ? ` variation ${i+1}` : ""), num_images:1, image_size:"square_hd", num_inference_steps:4 })
+          body:JSON.stringify({ prompt: basePrompt + (i > 0 ? `, unique angle variation ${i+1}` : ""), num_images:1, image_size:"square_hd", num_inference_steps:4 })
         }).then(r=>r.json())
       );
       const results = await Promise.all(jobs);
@@ -199,6 +201,10 @@ function ImagesTab({ client }) {
       setImages(urls);
     } catch(e) { setError(e.message||"Image generation failed."); }
     setLoading(false);
+  };
+
+  const openCanva = () => {
+    window.open("https://www.canva.com/create/instagram-posts/", "_blank");
   };
 
   return (
@@ -211,28 +217,51 @@ function ImagesTab({ client }) {
             <div><Label>Number of images</Label><select value={count} onChange={e=>setCount(Number(e.target.value))} style={baseInp}>{[1,2,3,4].map(n=><option key={n} value={n}>{n} image{n>1?"s":""}</option>)}</select></div>
           </div>
           <div><Label>Extra details (optional)</Label><input value={extra} onChange={e=>setExtra(e.target.value)} placeholder="e.g. pink roses, marble surface, gold packaging..." style={baseInp}/></div>
-          <div style={{ padding:"10px 12px", background:"rgba(124,106,255,.07)", border:"1px solid rgba(124,106,255,.15)", borderRadius:8, fontSize:12, color:"#888898", lineHeight:1.5 }}>
-            <span style={{ color:"#7c6aff", fontWeight:500 }}>Auto-tuned for {client.name}:</span> Lighting and mood will match the <span style={{color:"#ededf5"}}>{client.tone}</span> brand tone automatically.
+          <div style={{ padding:"10px 12px", background:"rgba(34,211,160,.06)", border:"1px solid rgba(34,211,160,.15)", borderRadius:8, fontSize:12, color:"#888898", lineHeight:1.6 }}>
+            <span style={{ color:"#22d3a0", fontWeight:500 }}>✓ Text-free mode on:</span> Images are generated without any letters or words — ready to brand in Canva with your client's fonts and logo.
           </div>
         </div>
         <GenBtn onClick={generate} loading={loading} label={`Generate ${count} product image${count>1?"s":""}`}/>
       </Panel>
+
       <ErrorBox msg={error}/>
+
       {loading && (
         <div style={{ textAlign:"center", padding:48, color:"#888898" }}>
           <div style={{ fontSize:13, marginBottom:6 }}>Generating {count} image{count>1?"s":""} for {client.name}...</div>
           <div style={{ fontSize:11 }}>This takes 10–20 seconds ☕</div>
         </div>
       )}
-      {images.length>0 && <>
-        <SectionLabel>Generated images — right-click to save</SectionLabel>
+
+      {images.length > 0 && <>
+        <SectionLabel>Generated images</SectionLabel>
+
+        <div style={{ padding:"12px 14px", background:"rgba(124,106,255,.07)", border:"1px solid rgba(124,106,255,.15)", borderRadius:10, marginBottom:14, display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+          <div>
+            <div style={{ fontSize:13, color:"#ededf5", fontWeight:500, marginBottom:3 }}>Ready to brand in Canva</div>
+            <div style={{ fontSize:12, color:"#888898" }}>Open Canva → upload your image → add your client's text, logo, and colors</div>
+          </div>
+          <button onClick={openCanva} style={{ padding:"9px 18px", borderRadius:8, border:"none", background:"#7c6aff", color:"#fff", cursor:"pointer", fontFamily:"'Space Grotesk',system-ui,sans-serif", fontSize:12, fontWeight:600, whiteSpace:"nowrap", flexShrink:0 }}>
+            Open Canva ↗
+          </button>
+        </div>
+
         <div style={{ display:"grid", gridTemplateColumns:`repeat(${Math.min(count,2)},1fr)`, gap:12, marginBottom:12 }}>
           {images.map((url,i)=>(
             <div key={i} style={{ background:"#1a1a26", border:"1px solid #252535", borderRadius:10, overflow:"hidden" }}>
               <img src={url} alt={`Product image ${i+1}`} style={{ width:"100%", display:"block" }}/>
-              <div style={{ padding:"9px 12px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div style={{ padding:"9px 12px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
                 <span style={{ fontSize:11, color:"#888898" }}>Image {i+1}</span>
-                <a href={url} target="_blank" rel="noreferrer" style={{ fontSize:11, color:"#7c6aff", textDecoration:"none", padding:"3px 10px", border:"1px solid rgba(124,106,255,.3)", borderRadius:5 }}>Open full ↗</a>
+                <div style={{ display:"flex", gap:6 }}>
+                  <a href={url} target="_blank" rel="noreferrer"
+                    style={{ fontSize:11, color:"#888898", textDecoration:"none", padding:"4px 10px", border:"1px solid #353548", borderRadius:5 }}>
+                    Save ↓
+                  </a>
+                  <button onClick={openCanva}
+                    style={{ fontSize:11, color:"#7c6aff", padding:"4px 10px", border:"1px solid rgba(124,106,255,.3)", borderRadius:5, background:"none", cursor:"pointer", fontFamily:"inherit" }}>
+                    Edit in Canva ↗
+                  </button>
+                </div>
               </div>
             </div>
           ))}

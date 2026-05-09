@@ -233,19 +233,15 @@ function ImagesTab({ client }) {
     const prompt = `${scene}. ${toneStyle}. Keep the product exactly as it is, same shape, same packaging, same colors. Only change the background and setting. Professional commercial photography. ${extra}`.trim();
     try {
       const jobs = Array.from({length:count}, (_,i) =>
-        fetch("https://fal.run/fal-ai/flux/dev/image-to-image", {
-          method:"POST",
-          headers:{ "Authorization":`Key ${FAL_KEY}`, "Content-Type":"application/json" },
-          body:JSON.stringify({
-            image_url: uploadedUrl,
-            prompt: prompt + (i > 0 ? ` composition variation ${i+1}` : ""),
-            strength: 0.75,
-            num_images: 1,
-            num_inference_steps: 28,
-            guidance_scale: 3.5,
-          })
-        }).then(r=>r.json())
-      );
+  fetch("https://fal.run/fal-ai/bria/background/replace", {
+    method:"POST",
+    headers:{ "Authorization":`Key ${FAL_KEY}`, "Content-Type":"application/json" },
+    body:JSON.stringify({
+      image_url: uploadedUrl,
+      prompt: prompt + (i > 0 ? `, variation ${i+1}, slightly different angle and composition` : ""),
+    })
+  }).then(r=>r.json())
+);
       const results = await Promise.all(jobs);
       const urls = results.flatMap(r=>(r.images||[]).map(img=>img.url)).filter(Boolean);
       if (!urls.length) throw new Error("No images returned. Please check your fal.ai credits.");
